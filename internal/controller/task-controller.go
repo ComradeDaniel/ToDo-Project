@@ -247,14 +247,20 @@ func (c *taskController) RelocateCategory(ctx *gin.Context) {
 		})
 		return
 	}
-	categories, err := c.service.RelocateCategory(category, username)
+	err = c.service.RelocateCategory(category, username)
+	type getdata struct {
+		Categories []database.Categories `json:"categories"`
+		Tasks      []database.Task       `json:"tasks"`
+	}
+	var data getdata
+	data.Categories, data.Tasks = c.service.GetAllTasksAndCategories(username)
 	if err != nil {
 		ctx.JSON(http.StatusForbidden, gin.H{
 			"error": err.Error(),
 		})
 		return
 	}
-	ctx.JSON(http.StatusOK, categories)
+	ctx.JSON(http.StatusOK, data)
 }
 
 func (c *taskController) GetAllTasksAndCategories(ctx *gin.Context) {

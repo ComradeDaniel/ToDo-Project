@@ -1,49 +1,53 @@
 # Project todolist
 
-One Paragraph of project description goes here
+Mein Todo-Listen Projekt für meine Bewerbung. Von Daniel Baliakin
 
-## Getting Started
+## Start
 
-These instructions will get you a copy of the project up and running on your local machine for development and testing purposes. See deployment for notes on how to deploy the project on a live system.
+Um diese Anwendung zu starten braucht man:
+- Eine postgreSQL Instanz
+- Eine .env Datei in der root directory mit folgendem Inhalt:
+            
+            PORT= // dein Port
+            APP_ENV=local
+            DB_HOST= // der Host auf welcher die PostgreSQL Datenbank läuft
+            DB_PORT= // der Port auf welchen die PostgreSQL Datenbank hört
+            DB_DATABASE= // der Name der Datenbank in PostgreSQL
+            DB_USERNAME= // dein Benutzername in PostgreSQL
+            DB_PASSWORD= // dein Passwort in PostgreSQL
+            JWT_SECRET= // einen Geheimschlüssel zur Generierung von JSON Web Tokens (er sollte lang genug sein (> 256 bit))
 
-## MakeFile
+Starten der Anwendung im Terminal der root directory
+"""bash
+go run cmd/api/main.go
+"""
 
-run all make commands with clean tests
-```bash
-make all build
-```
+## Features
 
-build the application
-```bash
-make build
-```
+- Accounts registrieren und anmelden
+- Kategorien hinzufügen oder löschen
+- Todos hinzufügen oder köschen
 
-run the application
-```bash
-make run
-```
+## Entstehung des Projekts
 
-Create DB container
-```bash
-make docker-run
-```
+Benutzte Tools: 
 
-Shutdown DB container
-```bash
-make docker-down
-```
+- go-blueprint (https://github.com/Melkeydev/go-blueprint):
+    Erstellung des Boilerplate Codes für einen Go Webserver mit Gin Gonic und PostgreSQL Unterstützung
 
-live reload the application
-```bash
-make watch
-```
+- ChatGPT
+    Erstellung der html und css Dateien sowie ein paar Funktionen in JavaScript
 
-run the test suite
-```bash
-make test
-```
+- golang-jwt (github.com/golang-jwt/jwt/v5):
+    Authentifiezierung mittels JSON Web Tokens
 
-clean up binary from the last build
-```bash
-make clean
-```
+
+## Retrospekte Verbesserungvorschläge
+
+- Repository Pattern benutzen. Meine database Datei ist schon ziemlich vollgepackt geworden.
+- Möglicherweise eine andere Methode zur Interaktion mit der Datenbank.
+  Die SQL Queries waren relativ fehleranfällig während der Entwicklung und wahrscheinlich sind sie auch nicht wirklich sicher gegen
+  SQL Injections, zum Beispiel.
+- Mehr mit Context arbeiten. Scheint eine gute Praktik zu sein da man zum Beispiel das handeln eines abgebrochenen Requests ebenfalls abbrechen kann oder 
+  Interprozesskommunkationen nutzen kann
+- Tests schreiben. Damit habe ich leider wenig Erfahrung und ich bin leider auch nicht mehr zeitlich dazu gekommen.

@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -37,19 +36,16 @@ func GenerateToken(username string) string {
 
 func parseToken(tokenString string) (*jwt.Token, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		// Don't forget to validate the alg is what you expect:
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 
-		// hmacSampleSecret is a []byte containing your secret, e.g. []byte("my_secret_key")
 		hmacSampleSecret := []byte(os.Getenv("JWT_SECRET"))
 		return hmacSampleSecret, nil
 	})
 	return token, err
 }
 
-// Returns true, nil, username if the validation was successful. Returns false, err, "" otherwise
 func validateToken(tokenString string) error {
 
 	token, err := parseToken(tokenString)
@@ -72,7 +68,7 @@ type UnsignedResponse struct {
 }
 
 func JwtTokenCheck(c *gin.Context) {
-	jwtToken, err := extractBearerToken(c.GetHeader("Authorization"))
+	jwtToken, err := c.Cookie("jwt")
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, UnsignedResponse{
 			Message: err.Error(),
@@ -91,22 +87,9 @@ func JwtTokenCheck(c *gin.Context) {
 	c.Next()
 }
 
-func extractBearerToken(header string) (string, error) {
-	if header == "" {
-		return "", errors.New("bad header value given")
-	}
-
-	jwtToken := strings.Split(header, " ")
-	if len(jwtToken) != 2 {
-		return "", errors.New("incorrectly formatted authorization header")
-	}
-
-	return jwtToken[1], nil
-}
-
 func GetUsernameFromCtx(ctx *gin.Context) (string, error) {
 	username := ""
-	jwtToken, _ := extractBearerToken(ctx.GetHeader("Authorization"))
+	jwtToken, _ := ctx.Cookie("jwt")
 	token, _ := parseToken(jwtToken)
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok {

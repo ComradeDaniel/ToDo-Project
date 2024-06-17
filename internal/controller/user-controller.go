@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 	"todolist/internal/database"
 	"todolist/internal/service"
 
@@ -50,6 +51,13 @@ func (c userController) Register(ctx *gin.Context) {
 		})
 		return
 	}
+
+	http.SetCookie(ctx.Writer, &http.Cookie{
+		Name:    "jwt",
+		Value:   token,
+		Expires: time.Now().Add(60 * time.Minute),
+	})
+
 	ctx.JSON(http.StatusOK, gin.H{
 		"jwt": token,
 	})
@@ -82,6 +90,12 @@ func (c userController) Login(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, err)
 		return
 	}
+
+	http.SetCookie(ctx.Writer, &http.Cookie{
+		Name:    "jwt",
+		Value:   token,
+		Expires: time.Now().Add(60 * time.Minute),
+	})
 	ctx.JSON(http.StatusOK, gin.H{
 		"jwt": token,
 	})

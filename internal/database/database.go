@@ -133,7 +133,7 @@ CREATE TABLE IF NOT EXISTS "Categories" (
 	"id" bigint GENERATED ALWAYS AS IDENTITY NOT NULL UNIQUE,
 	"belongs_to" bigint NOT NULL,
 	"name" text,
-	"order" bigint UNIQUE NOT NULL,
+	"order" bigint NOT NULL,
 	PRIMARY KEY ("id"),
 	FOREIGN KEY ("belongs_to") REFERENCES "User"("id") ON DELETE CASCADE
 );
@@ -142,8 +142,8 @@ CREATE TABLE IF NOT EXISTS "Task" (
 	"id" bigint GENERATED ALWAYS AS IDENTITY NOT NULL UNIQUE,
 	"title" text,
 	"details" text,
-	"state" bigint NOT NULL,
-	"due" timestamp without time zone,
+	"state" bigint NOT NULL DEFAULT 0,
+	"due" text,
 	PRIMARY KEY ("id")
 );
 
@@ -170,7 +170,7 @@ CREATE TABLE IF NOT EXISTS "UserSharesWith" (
 	}
 }
 
-// Returns an empty User instance and sql.ErrNoRows if the user was not found
+// Returns an empty User instance and ErrNoResult if the user was not found
 func GetUserByUsername(username string) (User, error) {
 	querystr := `SELECT u.id, u.username, u.password FROM "User" u WHERE "username" = $1`
 	var user User
@@ -234,11 +234,11 @@ func GetUsernameByTaskId(task_id int64) (string, error) {
 
 // Returns an empty Categories instance and sql.ErrNoRows if the category was not found
 func GetCategoryByID(categoryId int64) (Categories, error) {
-	querystr := `SELECT c.id, c.belongs_to, c.name, c.order FROM "Categories" u WHERE "id" = $1`
+	querystr := `SELECT c.id, c.belongs_to, c.name, c.order FROM "Categories" c WHERE "id" = $1`
 	var category Categories
 	err := dbInstance.db.QueryRow(querystr, categoryId).Scan(&category.Id, &category.Belongs_to, &category.Name, &category.Order)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			log.Printf("No rows found with category ID %d\n", categoryId)
 			return Categories{}, err
 		}
@@ -384,8 +384,16 @@ func DeleteTask(task Task) {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	query0 := `SELECT "order", category_id FROM "CategoryTasks" WHERE task_id = $1`
 	query := `DELETE FROM "Task" WHERE id = $1`
 	query2 := `UPDATE "CategoryTasks" SET "order" = "order" - 1 WHERE "order" >= $1 AND category_id = $2`
+	var old_belongs_to int64
+	var old_order int64
+	err = tx.QueryRow(query0, task.Id).Scan(&old_order, &old_belongs_to)
+	if err != nil {
+		log.Fatal(err)
+	}
 	result, err := tx.Exec(query, task.Id)
 	if err != nil {
 		log.Fatal(err)
@@ -398,7 +406,7 @@ func DeleteTask(task Task) {
 		tx.Rollback()
 		log.Fatalf("expected to affect 1 row, affected %d", rows)
 	}
-	_, err = tx.Exec(query2, task.Order, task.Belongs_to)
+	_, err = tx.Exec(query2, old_order, old_belongs_to)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -451,14 +459,14 @@ func AddCategory(category Categories) int64 {
 		log.Fatal(err)
 	}
 	query := `INSERT INTO "Categories" ("belongs_to", "name", "order") VALUES ($1, $2, $3) RETURNING id`
-	query2 := `UPDATE "Categories" SET "order" = "order" + 1 WHERE "order" >= $1`
+	query2 := `UPDATE "Categories" SET "order" = "order" + 1 WHERE "order" >= $1 AND NOT "id" = $2`
 	var categoryID int64
 	err = tx.QueryRow(query, category.Belongs_to, category.Name, category.Order).Scan(&categoryID)
 	if err != nil {
 		tx.Rollback()
 		log.Fatal(err)
 	}
-	_, err = tx.Exec(query2, category.Order)
+	_, err = tx.Exec(query2, category.Order, categoryID)
 	if err != nil {
 		tx.Rollback()
 		log.Fatal(err)
@@ -517,9 +525,13 @@ func DeleteCategory(category Categories) {
 		tx.Rollback()
 		log.Fatalf("expected to affect 1 row, affected %d", rows)
 	}
+	err = tx.Commit()
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
-func ChangeCategoryOrder(category_id int64, to int64) []Categories {
+func ChangeCategoryOrder(category_id int64, to int64, belongs_to int64) {
 	var oldCategoryOrder int64
 	tx, err := dbInstance.db.BeginTx(context.TODO(), nil)
 	if err != nil {
@@ -534,11 +546,11 @@ func ChangeCategoryOrder(category_id int64, to int64) []Categories {
 	}
 
 	if oldCategoryOrder == to {
-		return nil
+		return
 	}
 	if oldCategoryOrder > to {
-		query = `UPDATE "Categories" SET "order" = "order" + 1 WHERE "order" >= $1 AND "order" < $2`
-		_, err = tx.Exec(query, to, oldCategoryOrder)
+		query = `UPDATE "Categories" SET "order" = "order" + 1 WHERE "order" >= $1 AND "order" < $2 AND belongs_to = $3`
+		_, err = tx.Exec(query, to, oldCategoryOrder, belongs_to)
 		if err != nil {
 			tx.Rollback()
 			log.Fatal(err)
@@ -571,30 +583,6 @@ func ChangeCategoryOrder(category_id int64, to int64) []Categories {
 			log.Fatal(err)
 		}
 	}
-
-	var categories []Categories
-	query = `SELECT id, "name", "belongs_to", "order" FROM "Categories" ORDER BY "order" ASC`
-	rows, err := dbInstance.db.Query(query)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return categories
-		}
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var category Categories
-		err = rows.Scan(&category.Id, category.Name, category.Belongs_to, category.Order)
-		if err != nil {
-			log.Fatal(err)
-		}
-		categories = append(categories, category)
-	}
-
-	if err = rows.Err(); err != nil {
-		log.Fatal(err)
-	}
-	return categories
 }
 
 func AddTask(task Task) Task {
@@ -607,23 +595,24 @@ func AddTask(task Task) Task {
 	query := `
 	WITH rows AS (
         INSERT INTO "Task" (title, details, state, due)
-        VALUES ($1, &2, $3, $4)
+        VALUES ($1, $2, $3, $4)
         RETURNING id
         )
         INSERT INTO "CategoryTasks" ("category_id", "order", "task_id")
         SELECT $5, $6, id FROM rows
-		RETURNING task_id
+		RETURNING task_id;
 	`
-	query2 := `UPDATE "CategoryTasks" SET "order" = "order" + 1 WHERE "order" >= $1 AND category_id = $2`
+	query2 := `UPDATE "CategoryTasks" SET "order" = "order" + 1 WHERE "order" >= $1 AND category_id = $2 AND NOT task_id = $3`
 
-	var taskID int64
-	err = tx.QueryRow(query, task.Title, task.Details, task.State, task.Due, task.Belongs_to, task.Order).Scan(&taskID)
+	err = tx.QueryRow(query, task.Title, task.Details, task.State, task.Due, task.Belongs_to, task.Order).Scan(&task.Id)
 	if err != nil {
 		tx.Rollback()
+		log.Println("query1")
 		log.Fatal(err)
 	}
-	_, err = tx.Exec(query2, task.Order, task.Belongs_to)
+	_, err = tx.Exec(query2, task.Order, task.Belongs_to, task.Id)
 	if err != nil {
+		log.Println("query2")
 		tx.Rollback()
 		log.Fatal(err)
 	}
@@ -633,6 +622,6 @@ func AddTask(task Task) Task {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("Task %s added with ID: %d\n", task.Title, taskID)
+	fmt.Printf("Task %s added with ID: %d\n", task.Title, task.Id)
 	return task
 }

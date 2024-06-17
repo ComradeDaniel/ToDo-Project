@@ -14,7 +14,7 @@ type TaskService interface {
 	AddCategory(database.Categories, string) (database.Categories, error)
 	UpdateCategory(database.Categories, string) (database.Categories, error)
 	DeleteCategory(database.Categories, string) error
-	RelocateCategory(database.Categories, string) ([]database.Categories, error)
+	RelocateCategory(database.Categories, string) error
 	GetAllTasksAndCategories(string) ([]database.Categories, []database.Task)
 	checkPermissionTask(int64, int64, string) bool
 	checkPermissionCategory(int64, string) bool
@@ -104,13 +104,19 @@ func (t *taskService) DeleteCategory(category database.Categories, username stri
 	return nil
 }
 
-func (t *taskService) RelocateCategory(category database.Categories, username string) ([]database.Categories, error) {
+func (t *taskService) RelocateCategory(category database.Categories, username string) error {
 	if !t.checkPermissionCategory(category.Id, username) {
-		return nil, ErrForbidden
+		return ErrForbidden
+	}
+	user, err := database.GetUserByUsername(username)
+	if err != nil {
+		if errors.Is(err, database.ErrNoResult) {
+			return ErrForbidden
+		}
 	}
 
-	categories := database.ChangeCategoryOrder(category.Id, category.Order)
-	return categories, nil
+	database.ChangeCategoryOrder(category.Id, category.Order, user.Id)
+	return nil
 }
 
 func (t *taskService) GetAllTasksAndCategories(username string) ([]database.Categories, []database.Task) {
