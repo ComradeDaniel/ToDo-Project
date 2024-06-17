@@ -34,6 +34,7 @@ func GenerateToken(username string) string {
 	return s
 }
 
+// Turns the token string into the Token type
 func parseToken(tokenString string) (*jwt.Token, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -46,6 +47,7 @@ func parseToken(tokenString string) (*jwt.Token, error) {
 	return token, err
 }
 
+// Validates a token that was received
 func validateToken(tokenString string) error {
 
 	token, err := parseToken(tokenString)
@@ -67,6 +69,7 @@ type UnsignedResponse struct {
 	Message interface{} `json:"message"`
 }
 
+// The handler function for the authentication middleware
 func JwtTokenCheck(c *gin.Context) {
 	jwtToken, err := c.Cookie("jwt")
 	if err != nil {
@@ -87,6 +90,7 @@ func JwtTokenCheck(c *gin.Context) {
 	c.Next()
 }
 
+// Extracts the username from the token so that the user does not have to be passed in as a request parameter all the time
 func GetUsernameFromCtx(ctx *gin.Context) (string, error) {
 	username := ""
 	jwtToken, _ := ctx.Cookie("jwt")

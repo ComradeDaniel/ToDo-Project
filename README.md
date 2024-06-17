@@ -17,16 +17,21 @@ Um diese Anwendung zu starten braucht man:
             DB_PASSWORD= // dein Passwort in PostgreSQL
             JWT_SECRET= // einen Geheimschlüssel zur Generierung von JSON Web Tokens (er sollte lang genug sein (> 256 bit))
 
-Starten der Anwendung im Terminal der root directory
+Starten der Anwendung im Terminal in der root directory
 """bash
 go run cmd/api/main.go
 """
+
+Jetzt nur noch den Endpoint .../login im Browser abfragen und schon kann man sich registrieren!
 
 ## Features
 
 - Accounts registrieren und anmelden
 - Kategorien hinzufügen oder löschen
-- Todos hinzufügen oder köschen
+- Todos hinzufügen oder löschen
+- Todos verschieben, sowohl untereinander als auch zwischen Kategorien
+- Kategorien verschieben
+- Todos als erledigt markieren
 
 ## Entstehung des Projekts
 
@@ -50,4 +55,11 @@ Benutzte Tools:
   SQL Injections, zum Beispiel.
 - Mehr mit Context arbeiten. Scheint eine gute Praktik zu sein da man zum Beispiel das handeln eines abgebrochenen Requests ebenfalls abbrechen kann oder 
   Interprozesskommunkationen nutzen kann
-- Tests schreiben. Damit habe ich leider wenig Erfahrung und ich bin leider auch nicht mehr zeitlich dazu gekommen.
+- Tests schreiben. Damit habe ich leider wenig Erfahrung und ich bin leider auch nicht mehr zeitlich dazu gekommen. :(
+
+
+## Anmerkungen
+
+- Die air, docker-compose und Makefile Dateien waren bereits im Boilerplate mit dabei. Allerdings habe ich diese nicht benutzt und kein Funktional vorgesehen.
+- Der JWT Token lebt eine Stunde. Es können Fehler auftreten sobald dieser abgelaufen ist. Ein erneutes Einloggen über /login löst aber das Problem!
+- Ich habe davor noch nie mit JavaScript oder Go programmiert.
